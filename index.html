@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Buffer Overflow — Offensive Security Visual</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #020810;
+    --bg2:       #040d1a;
+    --bg3:       #071525;
+    --panel:     #0a1f35;
+    --border:    #0d3a5c;
+    --glow:      #00d4ff;
+    --glow2:     #00ff9d;
+    --glow3:     #ff4d6d;
+    --glow4:     #ffb800;
+    --glow5:     #a855f7;
+    --text:      #c8e6f7;
+    --textdim:   #4a7a9b;
+    --mono:      'Share Tech Mono', monospace;
+    --head:      'Orbitron', sans-serif;
+    --body:      'Rajdhani', sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--body);
+    min-height: 100vh;
+    overflow-x: hidden;
+    position: relative;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,212,255,0.015) 2px, rgba(0,212,255,0.015) 4px);
+    pointer-events: none;
+    z-index: 1000;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: linear-gradient(rgba(0,212,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(0,212,255,0.04) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrapper { position: relative; z-index: 1; max-width: 960px; margin: 0 auto; padding: 32px 20px 60px; }
+
+  .hero { text-align: center; margin-bottom: 48px; position: relative; }
+  .hero-tag { display: inline-block; font-family: var(--mono); font-size: 11px; color: var(--glow); letter-spacing: 4px; text-transform: uppercase; border: 1px solid rgba(0,212,255,0.3); padding: 4px 14px; margin-bottom: 16px; position: relative; animation: tagPulse 3s ease-in-out infinite; }
+  .hero-tag::before, .hero-tag::after { content: ''; position: absolute; top: 50%; width: 30px; height: 1px; background: var(--glow); opacity: 0.4; }
+  .hero-tag::before { right: 100%; margin-right: 8px; }
+  .hero-tag::after  { left: 100%;  margin-left: 8px;  }
+  @keyframes tagPulse { 0%,100% { box-shadow: 0 0 8px rgba(0,212,255,0.2); } 50% { box-shadow: 0 0 20px rgba(0,212,255,0.5); } }
+
+  .hero h1 { font-family: var(--head); font-size: clamp(22px, 4vw, 38px); font-weight: 900; letter-spacing: 2px; text-transform: uppercase; color: #fff; text-shadow: 0 0 30px rgba(0,212,255,0.6), 0 0 60px rgba(0,212,255,0.2); margin-bottom: 10px; line-height: 1.15; }
+  .hero h1 span { color: var(--glow); }
+  .hero p { font-family: var(--mono); font-size: 13px; color: var(--textdim); letter-spacing: 2px; }
+
+  .statusbar { display: flex; gap: 20px; justify-content: center; margin-top: 20px; flex-wrap: wrap; }
+  .status-item { font-family: var(--mono); font-size: 11px; display: flex; align-items: center; gap: 6px; color: var(--textdim); }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; animation: blink 1.5s ease-in-out infinite; }
+  .dot-green  { background: var(--glow2); box-shadow: 0 0 6px var(--glow2); }
+  .dot-red    { background: var(--glow3); box-shadow: 0 0 6px var(--glow3); animation-delay:.5s; }
+  .dot-yellow { background: var(--glow4); box-shadow: 0 0 6px var(--glow4); animation-delay:1s; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+  .step { margin-bottom: 32px; position: relative; opacity: 0; transform: translateY(24px); animation: fadeUp 0.5s ease forwards; }
+  @keyframes fadeUp { to { opacity:1; transform:translateY(0); } }
+  .step:nth-child(1){animation-delay:.1s} .step:nth-child(2){animation-delay:.2s} .step:nth-child(3){animation-delay:.3s} .step:nth-child(4){animation-delay:.4s} .step:nth-child(5){animation-delay:.5s} .step:nth-child(6){animation-delay:.6s}
+
+  .step-header { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
+  .step-num { font-family: var(--head); font-size: 11px; font-weight: 700; color: var(--bg); background: var(--glow); width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%); }
+  .step-title { font-family: var(--head); font-size: 13px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--glow); }
+  .step-line { flex: 1; height: 1px; background: linear-gradient(90deg, var(--glow) 0%, transparent 100%); opacity: 0.3; }
+  .step-body { background: var(--panel); border: 1px solid var(--border); border-left: 2px solid var(--glow); padding: 20px 24px; position: relative; overflow: hidden; }
+  .step-body::before { content: ''; position: absolute; top: 0; right: 0; width: 60px; height: 60px; background: radial-gradient(circle at top right, rgba(0,212,255,0.06), transparent 70%); }
+
+  .step-danger  .step-num{background:var(--glow3)} .step-danger  .step-title{color:var(--glow3)} .step-danger  .step-body{border-left-color:var(--glow3)} .step-danger  .step-line{background:linear-gradient(90deg,var(--glow3) 0%,transparent 100%)}
+  .step-success .step-num{background:var(--glow2)} .step-success .step-title{color:var(--glow2)} .step-success .step-body{border-left-color:var(--glow2)} .step-success .step-line{background:linear-gradient(90deg,var(--glow2) 0%,transparent 100%)}
+  .step-warn    .step-num{background:var(--glow4)} .step-warn    .step-title{color:var(--glow4)} .step-warn    .step-body{border-left-color:var(--glow4)} .step-warn    .step-line{background:linear-gradient(90deg,var(--glow4) 0%,transparent 100%)}
+  .step-purple  .step-num{background:var(--glow5)} .step-purple  .step-title{color:var(--glow5)} .step-purple  .step-body{border-left-color:var(--glow5)} .step-purple  .step-line{background:linear-gradient(90deg,var(--glow5) 0%,transparent 100%)}
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media(max-width:600px){ .two-col { grid-template-columns:1fr; } }
+  .mini-panel { background: rgba(0,212,255,0.04); border: 1px solid rgba(0,212,255,0.15); padding: 14px 16px; }
+  .mini-panel h3 { font-family: var(--mono); font-size: 11px; color: var(--glow); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid rgba(0,212,255,0.15); }
+  .mini-panel p { font-size: 14px; line-height: 1.6; color: #8ab8d0; }
+  .mini-panel.green h3 { color: var(--glow2); }
+  .mini-panel.green    { border-color: rgba(0,255,157,0.2); background: rgba(0,255,157,0.03); }
+
+  .stack-label { font-family: var(--mono); font-size: 10px; color: var(--textdim); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px; }
+  .stack-row { display: flex; gap: 4px; margin-bottom: 8px; flex-wrap: wrap; }
+  .cell { flex: 1; min-width: 70px; padding: 10px 6px; text-align: center; font-family: var(--mono); font-size: 11px; border: 1px solid; position: relative; transition: all .2s; }
+  .cell .cell-label { font-size: 10px; opacity: .7; display: block; margin-top: 2px; }
+  .cell-buf  { border-color: rgba(0,255,157,0.4);  background: rgba(0,255,157,0.06);  color: var(--glow2); }
+  .cell-can  { border-color: rgba(255,184,0,0.5);  background: rgba(255,184,0,0.08);  color: var(--glow4); }
+  .cell-rbp  { border-color: rgba(0,212,255,0.4);  background: rgba(0,212,255,0.06);  color: var(--glow); }
+  .cell-rip  { border-color: rgba(0,212,255,0.6);  background: rgba(0,212,255,0.1);   color: #fff; font-weight:700; }
+  .cell-bad  { border-color: rgba(255,77,109,0.6); background: rgba(255,77,109,0.1);  color: var(--glow3); }
+  .cell-crash{ border-color: rgba(255,77,109,0.8); background: rgba(255,77,109,0.18); color: #fff; animation: badPulse 1s ease-in-out infinite; }
+  @keyframes badPulse { 0%,100%{box-shadow:0 0 4px rgba(255,77,109,0.4)} 50%{box-shadow:0 0 16px rgba(255,77,109,0.8)} }
+  .cell-nop   { border-color: rgba(168,85,247,0.4); background: rgba(168,85,247,0.06); color: var(--glow5); }
+  .cell-shell { border-color: rgba(168,85,247,0.7); background: rgba(168,85,247,0.14); color: #fff; font-weight:700; }
+
+  .arrow-down { text-align: center; color: var(--glow3); font-size: 18px; margin: 6px 0; animation: arrowPulse 1.5s ease-in-out infinite; }
+  .arrow-ok { color: var(--glow2); }
+  @keyframes arrowPulse { 0%,100%{opacity:.5} 50%{opacity:1} }
+
+  .verdict { font-family: var(--mono); font-size: 12px; padding: 8px 12px; border-left: 3px solid; margin-top: 10px; }
+  .verdict-ok  { border-color: var(--glow2); background: rgba(0,255,157,0.05); color: var(--glow2); }
+  .verdict-bad { border-color: var(--glow3); background: rgba(255,77,109,0.05); color: var(--glow3); }
+
+  .nop-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+  .nop-cell { width: 44px; height: 44px; border: 1px solid rgba(168,85,247,0.35); background: rgba(168,85,247,0.06); display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: 10px; color: var(--glow5); flex-shrink: 0; }
+  .nop-cell:hover { background: rgba(168,85,247,0.15); }
+  .nop-arrow { font-family: var(--mono); font-size: 16px; color: rgba(168,85,247,0.5); }
+  .shell-cell { padding: 10px 20px; border: 2px solid var(--glow5); background: rgba(168,85,247,0.14); font-family: var(--mono); font-size: 12px; color: #fff; animation: shellGlow 2s ease-in-out infinite; }
+  @keyframes shellGlow { 0%,100%{box-shadow:0 0 10px rgba(168,85,247,0.2)} 50%{box-shadow:0 0 30px rgba(168,85,247,0.5)} }
+  .nop-desc { font-size: 13px; color: #7a5fa0; font-family: var(--mono); margin-top: 8px; }
+
+  .payload-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 12px; }
+  @media(max-width:600px){ .payload-grid { grid-template-columns: repeat(2,1fr); } }
+  .payload-block { padding: 12px 8px; text-align: center; border: 1px solid; position: relative; overflow: hidden; }
+  .payload-block::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; }
+  .payload-block .pb-title { font-family: var(--mono); font-size: 11px; font-weight: 700; display: block; margin-bottom: 4px; }
+  .payload-block .pb-sub   { font-family: var(--mono); font-size: 9px; opacity: .7; display: block; margin-bottom: 2px; }
+  .payload-block .pb-desc  { font-family: var(--body); font-size: 11px; opacity: .6; display: block; }
+  .pb-nop  { border-color:rgba(168,85,247,.4); background:rgba(168,85,247,.07); color:var(--glow5); } .pb-nop::before  { background:var(--glow5); }
+  .pb-shell{ border-color:rgba(168,85,247,.7); background:rgba(168,85,247,.13); color:#e9d5ff; }      .pb-shell::before{ background:var(--glow5); }
+  .pb-canok{ border-color:rgba(255,184,0,.7);  background:rgba(255,184,0,.1);   color:var(--glow4); border-width:2px; } .pb-canok::before{ background:var(--glow4); }
+  .pb-rbp  { border-color:rgba(0,212,255,.4);  background:rgba(0,212,255,.06);  color:var(--glow); }  .pb-rbp::before  { background:var(--glow); }
+  .pb-rip2 { border-color:rgba(0,212,255,.8);  background:rgba(0,212,255,.12);  color:#fff; }          .pb-rip2::before { background:var(--glow); box-shadow:0 0 8px var(--glow); }
+
+  .analogy { display: flex; gap: 6px; align-items: flex-start; margin-top: 10px; padding: 10px 12px; background: rgba(0,212,255,0.04); border-left: 2px solid rgba(0,212,255,0.3); }
+  .analogy-icon { font-size: 18px; flex-shrink:0; }
+  .analogy p { font-size: 13px; color: #6a9db8; line-height: 1.6; }
+
+  .terminal { background: #000d1a; border: 1px solid rgba(0,212,255,0.25); padding: 20px 24px; font-family: var(--mono); font-size: 13px; position: relative; overflow: hidden; }
+  .terminal::before { content: '● ● ●'; display: block; color: #1a3a50; font-size: 12px; margin-bottom: 14px; letter-spacing: 4px; }
+  .terminal::after { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent, var(--glow), transparent); animation: scanLine 3s linear infinite; }
+  @keyframes scanLine { 0%{transform:translateX(-100%)} 100%{transform:translateX(100%)} }
+  .t-prompt { color: var(--glow); } .t-cmd { color: #fff; } .t-out { color: #4a9e7a; } .t-warn { color: var(--glow4); }
+  .t-root { color: var(--glow2); font-size: 15px; font-weight: 700; }
+  .t-line { margin: 3px 0; display: flex; gap: 8px; align-items: baseline; }
+  .success-badge { position: absolute; top: 20px; right: 20px; border: 1px solid var(--glow2); padding: 8px 14px; font-family: var(--head); font-size: 11px; font-weight: 700; letter-spacing: 2px; color: var(--glow2); text-transform: uppercase; animation: successPulse 2s ease-in-out infinite; }
+  @keyframes successPulse { 0%,100%{box-shadow:0 0 8px rgba(0,255,157,0.2)} 50%{box-shadow:0 0 20px rgba(0,255,157,0.5)} }
+
+  .divider { display: flex; align-items: center; gap: 12px; margin: 8px 0 32px; opacity: .3; }
+  .divider::before, .divider::after { content:''; flex:1; height:1px; background:var(--glow); }
+  .divider span { font-family:var(--mono); font-size:10px; color:var(--glow); white-space:nowrap; }
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+  <header class="hero">
+    <div class="hero-tag">// offensive security — exploit dev</div>
+    <h1>Comment fonctionne un<br><span>Buffer Overflow</span> ?</h1>
+    <p>Du programme innocent jusqu'au shell — guide visuel complet</p>
+    <div class="statusbar">
+      <div class="status-item"><span class="status-dot dot-green"></span>NX : DISABLED</div>
+      <div class="status-item"><span class="status-dot dot-red"></span>CANARY : MANUAL</div>
+      <div class="status-item"><span class="status-dot dot-yellow"></span>PIE : DISABLED</div>
+      <div class="status-item"><span class="status-dot dot-green"></span>SHELL : OBTAINED</div>
+    </div>
+  </header>
+
+  <div class="divider"><span>INIT SEQUENCE</span></div>
+
+  <section class="step">
+    <div class="step-header"><div class="step-num">01</div><div class="step-title">Le programme normal</div><div class="step-line"></div></div>
+    <div class="step-body">
+      <div class="two-col">
+        <div class="mini-panel">
+          <h3>// Analogie : la boite en carton</h3>
+          <p>Prevue pour 10 objets. Si on en met 15, les 5 en trop <strong style="color:var(--glow3)">debordent</strong> et ecrasent ce qui se trouve juste apres.</p>
+          <p style="margin-top:8px;">En memoire, c'est pareil : depasser la taille du buffer ecrase les donnees adjacentes.</p>
+        </div>
+        <div class="mini-panel green">
+          <h3>// La pile memoire normale</h3>
+          <div class="stack-row" style="flex-direction:column; gap:4px;">
+            <div class="cell cell-buf" style="flex:none; width:100%;">buffer (espace reserve)</div>
+            <div class="cell cell-rbp" style="flex:none; width:100%;">RBP — sauvegarde registre</div>
+            <div class="cell cell-rip" style="flex:none; width:100%;">RIP → adresse de retour</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="step step-warn">
+    <div class="step-header"><div class="step-num">02</div><div class="step-title">Le canari manuel — sentinelle</div><div class="step-line"></div></div>
+    <div class="step-body">
+      <div class="stack-label">// structure de la pile avec canari</div>
+      <div class="stack-row">
+        <div class="cell cell-buf">buffer<span class="cell-label">104 octets</span></div>
+        <div class="cell cell-can">rf8Z1A6<span class="cell-label">canari sentinelle</span></div>
+        <div class="cell cell-rbp">RBP<span class="cell-label">8 octets</span></div>
+        <div class="cell cell-rip">RIP<span class="cell-label">→ main()</span></div>
+      </div>
+      <div class="arrow-down arrow-ok">▼</div>
+      <div class="verdict verdict-ok">strcmp("rf8Z1A6", "rf8Z1A6") = 0 &nbsp;→&nbsp; canari intact — execution normale</div>
+      <div class="analogy" style="margin-top:12px;">
+        <div class="analogy-icon">🐦</div>
+        <p>Le canari est une valeur sentinelle placee <strong style="color:var(--glow4)">entre le buffer et RIP</strong>. Si le buffer deborde, cette valeur est ecrasee avant RIP. Le programme la verifie en fin de fonction — si elle a change, il s'arrete.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="step step-danger">
+    <div class="step-header"><div class="step-num">03</div><div class="step-title">L'overflow naif — echec detecte</div><div class="step-line"></div></div>
+    <div class="step-body">
+      <div class="stack-label">// envoi de 200 "A" sans strategie</div>
+      <div class="stack-row">
+        <div class="cell cell-bad">AAAAAAAA<span class="cell-label">overflow</span></div>
+        <div class="cell cell-bad">AAAAAAAA<span class="cell-label">overflow</span></div>
+        <div class="cell cell-bad">AAAA<span class="cell-label" style="color:var(--glow3)">canari ecrase !</span></div>
+        <div class="cell cell-bad">AAAA<span class="cell-label">RBP ecrase</span></div>
+        <div class="cell cell-crash">RIP=AAAA<span class="cell-label">CRASH !</span></div>
+      </div>
+      <div class="arrow-down">▼</div>
+      <div class="verdict verdict-bad">strcmp("AAAA", "rf8Z1A6") ≠ 0 &nbsp;→&nbsp; "Stack overflow detected. Terminating..."</div>
+    </div>
+  </section>
+
+  <section class="step step-success">
+    <div class="step-header"><div class="step-num">04</div><div class="step-title">Notre payload — contournement du canari</div><div class="step-line"></div></div>
+    <div class="step-body">
+      <div class="stack-label">// structure du payload gagnant (128 octets total)</div>
+      <div class="payload-grid">
+        <div class="payload-block pb-nop"><span class="pb-title">NOP sled</span><span class="pb-sub">\x90 × 77</span><span class="pb-desc">toboggan</span></div>
+        <div class="payload-block pb-shell"><span class="pb-title">Shellcode</span><span class="pb-sub">26 octets</span><span class="pb-desc">execve /bin/sh</span></div>
+        <div class="payload-block pb-canok"><span class="pb-title">rf8Z1A6</span><span class="pb-sub">canari intact !</span><span class="pb-desc">reecrit a l'identique</span></div>
+        <div class="payload-block pb-rbp"><span class="pb-title">RBP fictif</span><span class="pb-sub">B × 9</span><span class="pb-desc">alignement</span></div>
+        <div class="payload-block pb-rip2"><span class="pb-title">RIP</span><span class="pb-sub">0x7fff…db90</span><span class="pb-desc">→ NOP sled</span></div>
+      </div>
+      <div class="verdict verdict-ok">strcmp("rf8Z1A6", "rf8Z1A6") = 0 &nbsp;→&nbsp; canari OK — execution continue vers notre shellcode</div>
+      <div class="analogy" style="border-left-color:rgba(0,255,157,.4); margin-top:12px;">
+        <div class="analogy-icon">🔑</div>
+        <p>Au lieu d'ecraser le canari avec des "A", on <strong style="color:var(--glow2)">reecrit exactement sa valeur originale</strong>. Le strcmp voit deux chaines identiques et laisse le programme continuer vers notre shellcode.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="step step-purple">
+    <div class="step-header"><div class="step-num">05</div><div class="step-title">Le NOP sled — toboggan d'atterrissage</div><div class="step-line"></div></div>
+    <div class="step-body">
+      <div class="stack-label">// chaque \x90 = "ne rien faire, passer a la suivante"</div>
+      <div class="nop-row">
+        <div class="nop-cell">\x90</div>
+        <div class="nop-cell">\x90</div>
+        <div class="nop-cell">\x90</div>
+        <div class="nop-cell">\x90</div>
+        <div class="nop-cell">\x90</div>
+        <div class="nop-arrow">→→→</div>
+        <div class="shell-cell">SHELLCODE<br><span style="font-size:10px;color:var(--glow5);">/bin/sh</span></div>
+        <div class="nop-arrow" style="color:rgba(0,212,255,.4);">→→→</div>
+        <div style="font-family:var(--mono);font-size:11px;color:var(--glow);padding:8px;">RIP atterrit<br>n'importe ici<br><span style="color:rgba(0,212,255,.4);">→ glisse</span></div>
+      </div>
+      <div class="nop-desc">Si l'adresse de RIP atterrit n'importe ou dans la zone \x90, le processeur glisse automatiquement jusqu'au vrai shellcode.</div>
+    </div>
+  </section>
+
+  <section class="step step-success">
+    <div class="step-header"><div class="step-num">06</div><div class="step-title">Resultat — shell obtenu</div><div class="step-line"></div></div>
+    <div class="step-body" style="padding:0;">
+      <div class="terminal" style="padding:20px 24px;">
+        <div class="success-badge">SHELL ✓</div>
+        <div class="t-line"><span class="t-prompt">$</span><span class="t-cmd">./examExploit.exe "[payload]" '!7ryH4rD3R5478!'</span></div>
+        <div class="t-line" style="margin-top:8px;"><span class="t-out">Username: [NOP×77][shellcode][rf8Z1A6][RBP][RIP]</span></div>
+        <div class="t-line"><span class="t-out">Verifying password...</span></div>
+        <div class="t-line"><span class="t-out">Access granted!</span></div>
+        <div class="t-line"><span class="t-warn">process 79043 is executing new program: /usr/bin/dash</span></div>
+        <div class="t-line" style="margin-top:8px;"><span class="t-prompt">$</span><span class="t-cmd">whoami</span></div>
+        <div class="t-line"><span class="t-root">kali</span></div>
+        <div class="t-line" style="margin-top:4px;"><span class="t-prompt">$</span><span class="t-cmd">id</span></div>
+        <div class="t-line"><span class="t-root">uid=1000(kali) gid=1000(kali) groups=1000(kali)...</span></div>
+        <div class="t-line" style="margin-top:4px;"><span class="t-prompt">$</span><span class="t-cmd">ls</span></div>
+        <div class="t-line"><span class="t-root">examExploit.exe&nbsp;&nbsp;exploit.py&nbsp;&nbsp;payload.bin</span></div>
+        <div class="t-line" style="margin-top:8px;"><span class="t-prompt" style="animation:blink 1s infinite;">█</span></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider" style="margin-top:40px;"><span>END OF SEQUENCE</span></div>
+
+  <footer style="text-align:center; font-family:var(--mono); font-size:10px; color:var(--textdim); letter-spacing:2px;">
+    EXPLOITATION COMPLETE — BUFFER OVERFLOW via STRCPY — NX:DISABLED — CANARY:BYPASSED — SHELL:OBTAINED
+  </footer>
+
+</div>
+</body>
+</html>
